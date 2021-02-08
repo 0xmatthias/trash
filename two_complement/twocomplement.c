@@ -7,8 +7,8 @@
 /* Datentyp fuer binaere Zahlen beliebiger Laenge. */
 typedef char Twocomplement[LENGTH];
 
-static void copy_long(char * dst, char  * src, long length);
-static void tc_set(char * tc, char val, long length);
+static void copy_long(Twocomplement* tc, long * val, int write);
+static void tc_set(Twocomplement* tc, char val, long length);
 static long tc_long_length();
 
 /* Gibt die Binaere Zahl tc aus. */
@@ -17,11 +17,7 @@ void printTC(Twocomplement* tc)
 	char * tc_arr = *tc;
 
 	for (long i = (LENGTH - 1); i >= 0; i--){
-		char val = tc_arr[i];
-
-		for (int j = 0; j < 8*sizeof(char); j++){
-			printf("%d", (val >> j) & (0x01));
-		}
+		printf("%d", tc_arr[i]);
 	}
 
 	printf("\n");
@@ -31,7 +27,7 @@ void printTC(Twocomplement* tc)
 long to_long(Twocomplement* tc)
 {
 	long number = 0;
-	copy_long((char *) &number, (char *) tc, tc_long_length());
+	copy_long(tc, &number, 0);
 	return number;
 }
 
@@ -42,31 +38,62 @@ void two_complement(Twocomplement* tc)
 
 	int overflow = 1;
 	for(long i=0; i < LENGTH; i++){
-		tc_arr[i]= ~tc_arr[i];// Ihr Code hier...
+		/*
+		tc_arr[i]= tc_arr[i] ^ 1;// Ihr Code hier...
 
 		if (overflow){
-			tc_arr[i] = tc_arr[i] + 1;
+			tc_arr[i] = tc_arr[i] ^ 1;
 
 			if (tc_arr[i] != 0){
 				overflow = 0;
 			}
+		}*/
+
+		if (!overflow){
+			tc_arr[i] = tc_arr[i] ^ 1;
+		} else {
+			overflow = !tc_arr[i];
 		}
 	}
 }
 
-// see memcpy for more details
-static void copy_long(char * dst, char  * src, long length)
+static void copy_long(Twocomplement* tc, long * val, int write)
 {
-	for (long i = 0; i < length; i++){
-		dst[i] = src[i];
+	long length = tc_long_length();
+	char * tc_arr = *tc;
+
+	if (write){
+		for (long i = 0; i < length; i++){
+			tc_arr[i] = (*val >> i) & 1;
+		}
+	} else {
+		*val = 0;
+		int is_neg = 0;
+
+		if (tc_arr[LENGTH - 1]){
+			is_neg = 1;
+			two_complement(tc);
+		}
+
+		for (long i = 0; i < length; i++){
+			long b = tc_arr[i] << i;
+			*val = *val | b;
+		}
+
+		if (is_neg){
+			*val = *val *(-1);
+			two_complement(tc);
+		}
 	}
 }
 
 // see memset for more details
-static void tc_set(char * tc, char val, long length)
+static void tc_set(Twocomplement* tc, char val, long length)
 {
+	char * tc_arr = *tc;
+
 	for (long i = 0; i < length; i++){
-		tc[i] = val;
+		tc_arr[i] = val;
 	}
 }
 
@@ -74,9 +101,9 @@ static long tc_long_length()
 {
 	long length = LENGTH;
 
-	if (LENGTH > sizeof(long)) {
+	if (LENGTH > 8*sizeof(long)) {
 		fprintf(stderr, "WARNING LENGTH > sizeof(long), invariant violated\n");
-		length = sizeof(long);
+		length = 8*sizeof(long);
 	}
 
 	return length;
@@ -91,7 +118,7 @@ Twocomplement* newTC(long x)
 		return NULL;
 	}
 
-	tc_set((char *) number, 0, LENGTH);
+	tc_set(number, 0, LENGTH);
 
 	int is_neg = 0;
 
@@ -100,7 +127,7 @@ Twocomplement* newTC(long x)
 		x = x * (-1);
 	}
 
-	copy_long((char *) number, (char *) &x, tc_long_length());
+	copy_long(number, &x, 1);
 
 	if (is_neg){
 		two_complement(number);
